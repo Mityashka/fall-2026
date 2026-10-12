@@ -3,7 +3,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-df = pd.read_csv("Credit_card.csv")
+#внешние данные
+DATA_URL = "https://raw.githubusercontent.com/AbhishekDataAnalyst/Credit-Card-Approval/main/Credit_card.csv"
+
+df = pd.read_csv(DATA_URL)
 
 print(df.shape)
 print(df.head())
@@ -16,38 +19,12 @@ X = df.drop("Car_Owner", axis=1)
 
 print(y.value_counts())
 #%%
-#заполнение пропусков
-
-X["GENDER"] = X["GENDER"].fillna(
-    X["GENDER"].mode()[0]
-)
-#профессия
-X["Type_Occupation"] = X["Type_Occupation"].fillna(
-    "Unknown"
-)
-#годовой
-X["Annual_income"] = X["Annual_income"].fillna(
-    X["Annual_income"].median()
-)
-
-X["Birthday_count"] = X["Birthday_count"].fillna(
-    X["Birthday_count"].median()
-)
-
-print(X.isna().sum().sum(), "пропусков")
-#%%
-#кодировка категоральных признаков
-
-X = pd.get_dummies(X, drop_first=True)
-X = X.astype(int)
-
-print("Количество признаков:", X.shape[1])
-#%%
 from sklearn.model_selection import train_test_split
 
 #x-признак
 #y-правильный ответ
 
+#сплит до любой обработки, чтобы статистики считались только по train
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
@@ -58,6 +35,43 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 print("X_train:", X_train.shape)
 print("X_test:", X_test.shape) #205
+#%%
+#заполнение пропусков (статистики считаем по train и применяем к test)
+
+X_train = X_train.copy()
+X_test = X_test.copy()
+
+gender_mode = X_train["GENDER"].mode()[0]
+income_median = X_train["Annual_income"].median()
+birthday_median = X_train["Birthday_count"].median()
+
+X_train["GENDER"] = X_train["GENDER"].fillna(gender_mode)
+X_test["GENDER"] = X_test["GENDER"].fillna(gender_mode)
+#профессия
+X_train["Type_Occupation"] = X_train["Type_Occupation"].fillna("Unknown")
+X_test["Type_Occupation"] = X_test["Type_Occupation"].fillna("Unknown")
+#годовой
+X_train["Annual_income"] = X_train["Annual_income"].fillna(income_median)
+X_test["Annual_income"] = X_test["Annual_income"].fillna(income_median)
+
+X_train["Birthday_count"] = X_train["Birthday_count"].fillna(birthday_median)
+X_test["Birthday_count"] = X_test["Birthday_count"].fillna(birthday_median)
+
+print(X_train.isna().sum().sum(), "пропусков в train")
+print(X_test.isna().sum().sum(), "пропусков в test")
+#%%
+#кодировка категоральных признаков
+#test кодируем без drop_first и приводим к колонкам train:
+#так выпадает та же категория, что и в train, а неизвестные категории игнорируются
+
+X_train = pd.get_dummies(X_train, drop_first=True)
+X_test = pd.get_dummies(X_test)
+X_test = X_test.reindex(columns=X_train.columns, fill_value=0)
+
+X_train = X_train.astype(int)
+X_test = X_test.astype(int)
+
+print("Количество признаков:", X_train.shape[1])
 #%%
 #кодировка классов
 
@@ -272,13 +286,12 @@ print("Конечная ошибка:", losses_sgd[-1])
 print("Конечная рекуррентная оценка q:", q_sgd[-1])
 #%%
 #оптимальный шаг для обучения
-def optimal_step(X, grad_w):
-    N = X.shape[0]
+def optimal_step(X, grad_w, grad_b):
+    #направление по расширенному вектору (w, b): X @ grad_w + grad_b
+    direction = X @ grad_w + grad_b
 
-    H_grad = (X.T @ (X @ grad_w)) / N
-
-    numerator = np.sum(grad_w ** 2)
-    denominator = np.sum(grad_w * H_grad)
+    numerator = np.sum(grad_w ** 2) + grad_b ** 2
+    denominator = np.mean(direction ** 2)
 
     if denominator == 0:
         return 0.01
@@ -299,7 +312,7 @@ def train_steepest_descent(X, y, epochs=1000):
 
         grad_w, grad_b = gradient(X, y, w, b)
 
-        lr = optimal_step(X, grad_w)
+        lr = optimal_step(X, grad_w, grad_b)
 
         w = w - lr * grad_w
         b = b - lr * grad_b
