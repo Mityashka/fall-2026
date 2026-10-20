@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-#внешние данные
+#данные из внешнего источника
 DATA_URL = "https://raw.githubusercontent.com/AbhishekDataAnalyst/Credit-Card-Approval/main/Credit_card.csv"
 
 df = pd.read_csv(DATA_URL)
@@ -746,11 +746,14 @@ print(
 )
 #%%
 #график отступов
+#слева ошибки, дальше пограничные, справа норм
+margins_sorted = np.sort(margins_test)
+
 plt.figure(figsize=(10, 5))
 
 plt.scatter(
-    range(len(margins_test)),
-    margins_test,
+    range(len(margins_sorted)),
+    margins_sorted,
     s=15
 )
 
